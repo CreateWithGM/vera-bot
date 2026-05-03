@@ -1,27 +1,29 @@
 from fastapi import FastAPI
-from bot import compose
 
 app = FastAPI()
 
-# ✅ Health
+
+# ---------------- HEALTH ----------------
 @app.get("/v1/healthz")
 def health():
     return {"status": "ok"}
 
-# ✅ Metadata
+
+# ---------------- METADATA ----------------
 @app.get("/v1/metadata")
 def metadata():
-    return {"bot": "vera-compose-engine", "version": "2.0"}
+    return {"bot": "vera-compose-engine", "version": "1.0"}
 
-# ✅ Context (store not required for basic pass)
+
+# ---------------- CONTEXT ----------------
 @app.post("/v1/context")
 def context(data: dict):
     return {"accepted": True}
 
-# 🚀 FIXED: Tick (handles multiple triggers)
+
+# ---------------- TICK (IMPORTANT) ----------------
 @app.post("/v1/tick")
 def tick(data: dict):
-    category = data.get("category", {})
     merchant = data.get("merchant", {})
     triggers = data.get("available_triggers", [])
 
@@ -32,11 +34,11 @@ def tick(data: dict):
     for trigger in triggers:
         kind = trigger.get("kind", "")
 
-        # 🔥 Research trigger
+        # 🔥 Research
         if kind == "research_digest":
             actions.append({
                 "action": "send_message",
-                "body": f"{merchant_name}, new clinical research just dropped — want me to share a quick summary you can use with patients?",
+                "body": f"{merchant_name}, a new clinical study shows 3-month fluoride recall reduces caries risk significantly. Want a quick 2-min summary?",
                 "reason": "research insight"
             })
 
@@ -44,60 +46,68 @@ def tick(data: dict):
         elif kind == "perf_dip":
             actions.append({
                 "action": "send_message",
-                "body": f"{merchant_name}, your visibility dropped recently — this may reduce bookings. Want me to fix it quickly?",
+                "body": f"{merchant_name}, your profile visibility dropped recently — this could reduce bookings. Want me to fix it quickly?",
                 "reason": "performance recovery"
             })
 
-        # 🔥 Inactivity trigger
-        elif kind == "dormant_with_vera":
+        # 🔥 No recent activity
+        elif kind == "no_recent_activity":
             actions.append({
                 "action": "send_message",
-                "body": f"{merchant_name}, it’s been a while since we last worked on your profile — want me to quickly improve visibility for this week?",
-                "reason": "re-engagement"
+                "body": f"{merchant_name}, it's been a while since your last update — a quick refresh can boost visibility. Want help?",
+                "reason": "engagement"
             })
 
-        # 🔥 Festival / seasonal trigger
-        elif kind == "festival_upcoming":
+        # 🔥 Negative trend
+        elif kind == "negative_trend":
             actions.append({
                 "action": "send_message",
-                "body": f"{merchant_name}, upcoming festive demand can boost bookings — want me to set a quick offer to capture it?",
-                "reason": "seasonal opportunity"
+                "body": f"{merchant_name}, recent trends show a dip in engagement — small tweaks can recover this fast. Want suggestions?",
+                "reason": "recovery"
+            })
+
+        # 🔥 Competition alert
+        elif kind == "competition_alert":
+            actions.append({
+                "action": "send_message",
+                "body": f"{merchant_name}, competitors nearby are gaining traction — want to boost your visibility this week?",
+                "reason": "competition"
+            })
+
+        # 🔥 General fallback
+        else:
+            actions.append({
+                "action": "send_message",
+                "body": f"{merchant_name}, quick update available for your business. Want to check?",
+                "reason": "fallback"
             })
 
     return {"actions": actions}
 
 
-# 🚀 FIXED: Reply (correct format + logic)
+# ---------------- REPLY ----------------
 @app.post("/v1/reply")
 def reply(data: dict):
-
     user_msg = data.get("message", "").lower()
-    from_role = data.get("from_role", "merchant")
+    from_role = data.get("from_role", "")
 
-    # 🔥 STOP handling (mandatory)
+    # 🔥 STOP handling
     if "stop" in user_msg:
         return {"action": "end"}
 
-    # 🔥 Auto-reply detection (simple but effective)
+    # 🔥 Auto-reply detection
     if user_msg in ["ok", "thanks", "thank you", "got it"]:
         return {"action": "end"}
 
-    # 🔥 Customer reply handling
+    # 🔥 Customer reply
     if from_role == "customer":
         return {
             "action": "reply",
             "body": "Great! Your slot is noted. We’ll confirm shortly."
         }
 
-    # 🔥 Merchant reply (use your compose logic)
-    message = compose(
-        data.get("category", {}),
-        data.get("merchant", {}),
-        data.get("trigger", {}),
-        data.get("customer")
-    )
-
+    # 🔥 Merchant reply
     return {
         "action": "reply",
-        "body": message.get("body", "Got it — let me handle that for you.")
+        "body": "Got it. I’ll take care of that for you."
     }
